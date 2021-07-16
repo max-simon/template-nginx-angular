@@ -20,7 +20,7 @@ FROM registry.access.redhat.com/ubi8/nginx-118
 ARG APPLICATION="main"
 
 # Copy the nginx configuration
-COPY ./ops/nginx.conf /opt/app-root/etc/nginx.default.d/default.conf
+COPY ./nginx/nginx.conf /opt/app-root/etc/nginx.default.d/default.conf
 
 # Copy build from the 'build environment'
 COPY --from=build /opt/app-root/src/app/dist/${APPLICATION} /opt/app-root/src/
