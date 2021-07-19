@@ -1,6 +1,7 @@
 FROM node:latest as build
 
 ARG SKIP_TESTS=false
+ARG CONFIGURATION=production
 
 # create directory
 WORKDIR /opt/app-root/src/app
@@ -25,7 +26,7 @@ RUN if [ "$SKIP_TESTS" = "false" ]; \
     fi
 
 # build application
-RUN npm run build --output-path=dist --configuration=production
+RUN npm run build --output-path=dist --configuration=${CONFIGURATION}
 
 # Start from nginx
 FROM registry.access.redhat.com/ubi8/nginx-118
