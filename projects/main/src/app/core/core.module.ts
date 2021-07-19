@@ -1,12 +1,18 @@
 import { NgModule, Optional, SkipSelf } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { AppConfigService } from './services/app-config.service';
+import { HttpClientModule } from '@angular/common/http';
 
 
 
 @NgModule({
   declarations: [],
   imports: [
-    CommonModule
+    CommonModule,
+    HttpClientModule
+  ],
+  providers: [
+    AppConfigService
   ]
 })
 export class CoreModule {
