@@ -1,16 +1,25 @@
-FROM registry.access.redhat.com/ubi8/nodejs-14 as build
+FROM node:latest as build
 
+# install chromium
+RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+    sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' && \
+    apt-get update && apt-get install -y google-chrome-stable
+ENV CHROME_BIN=/usr/bin/google-chrome
+
+# create directory
 WORKDIR /opt/app-root/src/app
 
-# Install npm production packages
-COPY package.json .
-RUN npm install && \
-    npm install -g @angular/cli
+# install packages
+COPY package.json package-lock.json ./ 
+RUN npm ci 
 
-# Copy source code
-COPY . .
+# copy application data
+COPY . . 
+ 
+# run tests
+RUN npm run test:headless
 
-# Build application
+# build application
 RUN npm run build --output-path=dist --configuration=production
 
 # Start from nginx
