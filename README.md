@@ -18,4 +18,4 @@ The `AppConfig` service loads a configuration file during runtime. This allows t
 2. Mount the ConfigMap to the specified path:
 ```
     oc set volume deployment/<application name> --add --type configmap --configmap-name <configmap name> --mount-path /opt/app-root/src/assets/
-```
+```A test
