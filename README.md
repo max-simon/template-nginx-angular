@@ -1,27 +1,21 @@
-# TemplateNginxAngular
+# Angular Application with NGINX
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 12.1.2.
+## Deployment
 
-## Development server
+You can deploy this application to OpenShift using
+```
+    oc new-app --name <application name> <Git URL>
+```
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The app will automatically reload if you change any of the source files.
+## Configuration File
 
-## Code scaffolding
+The `AppConfig` service loads a configuration file during runtime. This allows to dynamically set configuration data. The file is located in `assets/config.json`. This can be overwritten in OpenShift with a ConfigMap:
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
-
-## Build
-
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
-
-## Running unit tests
-
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
-
-## Running end-to-end tests
-
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
-
-## Further help
-
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+1. Create a config map from a custom configuration file:
+```
+    oc create configmap <configmap name> --from-file config.json=<path to custom config file>
+```
+2. Mount the ConfigMap to the specified path:
+```
+    oc set volume deployment/<application name> --add --type configmap --configmap-name <configmap name> --mount-path /opt/app-root/src/assets/
+```
