@@ -7,7 +7,4 @@ import { AppConfigService } from './core/services/app-config.service';
   styleUrls: ['./app.component.scss']
 })
 export class AppComponent {
-  constructor(public appConfigService: AppConfigService) {
-    
-  }
 }
