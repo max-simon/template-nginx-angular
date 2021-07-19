@@ -1,10 +1,6 @@
 FROM node:latest as build
 
-# install chromium
-RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-    sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' && \
-    apt-get update && apt-get install -y google-chrome-stable
-ENV CHROME_BIN=/usr/bin/google-chrome
+ARG SKIP_TESTS=false
 
 # create directory
 WORKDIR /opt/app-root/src/app
@@ -17,7 +13,16 @@ RUN npm ci
 COPY . . 
  
 # run tests
-RUN npm run test:headless
+RUN if [ "$SKIP_TESTS" = "false" ]; \
+    then \
+    wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+    sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' && \
+    apt-get update && apt-get install -y google-chrome-stable; \
+    export CHROME_BIN=/usr/bin/google-chrome; \
+    npm run test:headless; \
+    else \
+    echo "Skip tests"; \
+    fi
 
 # build application
 RUN npm run build --output-path=dist --configuration=production
