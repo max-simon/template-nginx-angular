@@ -1,0 +1,58 @@
+replicaCount: 1
+
+image:
+  tag: ""
+  internalRegistry: image-registry.openshift-image-registry.svc:5000
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
+resources: {}
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+git:
+  url: https://github.com/max-simon/template-nginx-angular.git
+  ref: "main"
+
+buildConfig:
+  skipTests: "true"
+  application: "main"
+  configuration: "production"
