@@ -60,17 +60,3 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
-
-{{/*
-Create the full image name
-*/}}
-{{- define "base.fullImageName" -}}
-{{ .Values.image.internalRegistry }}/{{ .Release.Namespace }}/{{ include "base.fullname" . }}
-{{- end }}
-
-{{/*
-Create the image tag
-*/}}
-{{- define "base.fullImageTag" -}}
-{{ .Values.image.tag | default .Chart.AppVersion }}
-{{- end }}

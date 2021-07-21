@@ -18,14 +18,13 @@ docker build -t angular-app .
 ```
 You can set the following build arguments:
 - `SKIP_TESTS`: if set to `true` tests are not executed. Tests can be time consuming because they require a headless chrome (default `false`).
-- `CONFIGURATION`: choose the configuration specified in `angular.json` (default `production`)
 - `APPLICATION`: choose the application (in subfolder `projects`) to serve (default `main`)
 
 ## Dynamic Configuration
 
 Sometimes you want to change configuration data without rebuilding the image. The `AppConfig` service loads a configuration file during runtime. The file is located in `assets/config.json` and can be overwritten by e.g. ConfigMap objects.
 
-## Deployment
+## CI / CD
 
 ### Using OpenShift new-app
 
@@ -54,14 +53,23 @@ In order to use a ConfigMap for dynamic configuration of the application (see ab
     oc set volume deployment/<application name> --add --type configmap --configmap-name <configmap name> --mount-path /opt/app-root/src/assets/
 ```
 
-### Using Helm
+### Using Pipeline and Helm
 
-Set the correct Git URL and reference (branch/tag) in `values.yaml` (in `git` object). You can also modify the build arguments there (in `buildConfig` object). Afterwards, install the application to OpenShift using
-```
-    helm install <application name> chart/base
-```
+#### Setup the Pipeline
 
-and trigger a new build using
+The steps to setup a CI pipeline are described in [tekton](tekton).
+
+#### Deploy a Helm chart
+
+To deploy the application using `helm` you need to set the image repository (`image.repository`) and tag (`image.tag`)
 ```
-    oc start-build <build config name>
+    helm install <app-name> chart/base --set image.repository=<image repository uri> --set image.tag=<image tag>
+```
+If you use an OpenShift ImageStream, you might also want to set a trigger to automatically redeploy as soon as an image is pushed to the ImageStream:
+```
+    ... --set --set imageStreamTagTrigger.enabled=true --set imageStreamTagTrigger.name=<image stream name>:<image stream tag> --set imageStreamTagTrigger.namespace=<namespace of image stream>
+```
+If the Deployment and ImageStream are in different namespaces, make sure that the service accounts can pull from the ImageStream:
+```
+    oc policy add-role-to-group system:image-puller system:serviceaccounts:<namespace of deployment> --namespace=<namespace of imagestream>
 ```

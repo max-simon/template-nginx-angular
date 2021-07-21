@@ -1,6 +1,8 @@
 FROM node:latest as build
 
 ARG SKIP_TESTS=false
+ARG NPM_TEST_SCRIPT="test:headless"
+ARG NPM_BUILD_SCRIPT="build:prod"
 
 # create directory
 WORKDIR /opt/app-root/src/app
@@ -19,13 +21,13 @@ RUN if [ "$SKIP_TESTS" = "false" ]; \
     sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' && \
     apt-get update && apt-get install -y google-chrome-stable; \
     export CHROME_BIN=/usr/bin/google-chrome; \
-    npm run test:headless; \
+    npm run ${NPM_TEST_SCRIPT}; \
     else \
     echo "Skip tests"; \
     fi
 
 # build application
-RUN npm run build:prod
+RUN npm run ${NPM_BUILD_SCRIPT}
 
 # Start from nginx
 FROM registry.access.redhat.com/ubi8/nginx-118

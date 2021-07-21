@@ -4,9 +4,11 @@ metadata:
   name: {{ include "base.fullname" . }}
   labels:
     {{- include "base.labels" . | nindent 4 }}
+  {{- if .Values.imageStreamTagTrigger.enabled }}
   annotations:
     image.openshift.io/triggers: >-
-      [{"from":{"kind":"ImageStreamTag","name":"{{ include "base.fullname" . }}:{{ include "base.fullImageTag" . }}"},"fieldPath":"spec.template.spec.containers[?(@.name==\"angular-app\")].image"}]
+      [{"from":{"kind":"ImageStreamTag","name":"{{ .Values.imageStreamTagTrigger.name }}","namespace":"{{ .Values.imageStreamTagTrigger.namespace }}"},"fieldPath":"spec.template.spec.containers[?(@.name==\"angular-app\")].image"}]
+  {{- end }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -14,10 +16,6 @@ spec:
       {{- include "base.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       labels:
         {{- include "base.selectorLabels" . | nindent 8 }}
     spec:
@@ -25,18 +23,14 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      # serviceAccountName: {{ include "base.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      serviceAccountName: {{ include "base.serviceAccountName" . }}
       volumes:
         - name: config-volume
           configMap:
             name: {{ include "base.fullname" . }}
       containers:
         - name: angular-app
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ include "base.fullImageName" . }}:{{ include "base.fullImageTag" . }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           volumeMounts:
             - name: config-volume
@@ -55,15 +49,3 @@ spec:
               port: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
