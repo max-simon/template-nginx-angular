@@ -1,0 +1,221 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: angular-pipeline
+labels:
+  template: angular-pipeline
+objects:
+- apiVersion: tekton.dev/v1alpha1
+  kind: PipelineResource
+  metadata:
+    name: angular-pipeline-resource-image${POSTFIX}
+    labels:
+      template-instance: angular-pipeline${POSTFIX}
+  spec:
+    params:
+      - name: url
+        value: ${OUTPUT_REGISTRY}
+    type: image
+- apiVersion: tekton.dev/v1alpha1
+  kind: PipelineResource
+  metadata:
+    name: angular-pipeline-resource-git${POSTFIX}
+    labels:
+      template-instance: angular-pipeline${POSTFIX}
+  spec:
+    params:
+      - name: revision
+        value: ${GIT_REVISION}
+      - name: url
+        value: ${GIT_URL}
+    type: git
+- apiVersion: tekton.dev/v1beta1
+  kind: Task
+  metadata:
+    name: angular-pipeline-task-build
+  spec:
+    resources:
+      inputs:
+        - name: git-source
+          type: git
+      outputs:
+        - name: image
+          type: image
+    params:
+      - name: NODE_IMAGE
+        default: registry.access.redhat.com/ubi8/nodejs-14
+        description: node image to use for install, test and build
+      - name: BUILDAH_IMAGE
+        default: registry.redhat.io/rhel8/buildah
+        description: buildah image to use for building and pushing image
+      - name: NGINX_IMAGE
+        default: registry.access.redhat.com/ubi8/nginx-118
+        description: nginx image to use for output, must provide s2i scripts
+      - name: S2I_IMAGE
+        default: registry.redhat.io/ocp-tools-43-tech-preview/source-to-image-rhel8
+        description: S2I image to use
+      - name: APPLICATION
+        default: main
+        description: Name of Angular application (subfolder in dist)
+      - name: NPM_TEST_SCRIPT
+        default: test:headless
+        description: Name of run script to execute for testing
+      - name: NPM_BUILD_SCRIPT
+        default: build:prod
+        description: Name of build script to execute for testing
+    steps:
+      - image: registry.access.redhat.com/ubi8/ubi:8.4-206
+        name: copy-files
+        script: |
+          cp -r /workspace/git-source/. ./
+        workingDir: /workspace/app/
+      - image: $(params.NODE_IMAGE)
+        name: npm-install
+        script: |
+          npm config set puppeteer_skip_chromium_download true -g
+          npm install
+        workingDir: /workspace/app/
+      - image: node:latest
+        name: npm-test
+        script: |
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+          sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list';
+          apt-get update && apt-get install -y google-chrome-stable;
+          export CHROME_BIN=/usr/bin/google-chrome;
+          cp -r /workspace/app/* ./
+          npm run $(params.NPM_TEST_SCRIPT)
+        workingDir: /workspace/test/
+        volumeMounts:
+          - name: tmp-source-test
+            mountPath: /workspace/test
+      - image: $(params.NODE_IMAGE)
+        name: npm-build
+        script: |
+          npm run $(params.NPM_BUILD_SCRIPT)
+          mkdir ./dist/$(params.APPLICATION)/nginx-default-cfg/
+          cp -r ./nginx/nginx.conf ./dist/$(params.APPLICATION)/nginx-default-cfg/default.conf
+        workingDir: /workspace/app/
+      - image: $(params.S2I_IMAGE)
+        name: container-create-dockerfile
+        script: |
+          s2i build ./dist/$(params.APPLICATION) $(params.NGINX_IMAGE) --as-dockerfile /gen-source/Dockerfile.gen
+          cat /gen-source/Dockerfile.gen
+        volumeMounts:
+          - mountPath: /gen-source
+            name: gen-source
+        workingDir: /workspace/app/
+      - image: $(params.BUILDAH_IMAGE)
+        name: container-build
+        script: |
+          buildah bud --tls-verify=false --storage-driver=vfs --layers -f Dockerfile.gen -t $(resources.outputs.image.url) .
+        volumeMounts:
+          - mountPath: /gen-source
+            name: gen-source
+          - mountPath: /var/lib/containers
+            name: varlibcontainers
+        workingDir: /gen-source
+        securityContext:
+          privileged: true
+      - image: $(params.BUILDAH_IMAGE)
+        name: container-push
+        script: |
+          buildah push --tls-verify=false --storage-driver=vfs $(resources.outputs.image.url) docker://$(resources.outputs.image.url)
+        volumeMounts:
+          - mountPath: /var/lib/containers
+            name: varlibcontainers
+        securityContext:
+          privileged: true
+    volumes:
+      - name: varlibcontainers
+      - name: gen-source
+      - name: tmp-source-test
+    workspaces:
+      - name: app
+- apiVersion: tekton.dev/v1beta1
+  kind: Pipeline
+  metadata:
+    name: angular-pipeline
+  spec:
+    resources:
+      - name: git-source
+        type: git
+      - name: image
+        type: image
+    tasks:
+      - name: task
+        taskRef:
+          kind: Task
+          name: angular-pipeline-task-build
+        workspaces:
+          - name: app
+            workspace: app
+        resources:
+          inputs:
+            - name: git-source
+              resource: git-source
+          outputs: 
+            - name: image
+              resource: image
+    workspaces:
+      - name: app
+- apiVersion: triggers.tekton.dev/v1alpha1
+  kind: TriggerTemplate
+  metadata:
+    name: angular-pipeline-trigger${POSTFIX}
+    labels:
+      template-instance: angular-pipeline${POSTFIX}
+  spec:
+    resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: angular-pipeline-run${POSTFIX}-
+        labels:
+          tekton.dev/pipeline: angular-pipeline
+      spec:
+        pipelineRef:
+          name: angular-pipeline
+        resources:
+          - name: git-source
+            resourceRef:
+              name: angular-pipeline-resource-git${POSTFIX}
+          - name: image
+            resourceRef:
+              name: angular-pipeline-resource-image${POSTFIX}
+- apiVersion: triggers.tekton.dev/v1alpha1
+  kind: EventListener
+  metadata:
+    name: angular-pipeline-eventlistener${POSTFIX}
+    labels:
+      template-instance: angular-pipeline${POSTFIX}
+  spec:
+    serviceAccountName: pipeline
+    triggers:
+    - name: angular-pipeline-trigger${POSTFIX}
+      template:
+        name: angular-pipeline-trigger${POSTFIX}
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    labels:
+      eventlistener: angular-pipeline-eventlistener${POSTFIX}
+    name: angular-pipeline-webhook${POSTFIX}
+  spec:
+    port:
+      targetPort: http-listener
+    to:
+      kind: Service
+      name: el-angular-pipeline-eventlistener${POSTFIX}
+parameters:
+- name: GIT_URL
+  description: URL of Git Repository
+  required: true
+- name: GIT_REVISION
+  description: Git Revision to build
+  default: main
+- name: OUTPUT_REGISTRY
+  description: URI of output registry (e.g. ImageStream)
+  required: true
+- name: POSTFIX
+  description: Optional Postfix for names to allow for multiple pipelines in the same namespace
+  default: ""
