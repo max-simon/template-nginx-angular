@@ -1,7 +1,6 @@
 FROM node:latest as build
 
 ARG SKIP_TESTS=false
-ARG CONFIGURATION=production
 
 # create directory
 WORKDIR /opt/app-root/src/app
@@ -26,18 +25,25 @@ RUN if [ "$SKIP_TESTS" = "false" ]; \
     fi
 
 # build application
-RUN npm run build --output-path=dist --configuration=${CONFIGURATION}
+RUN npm run build:prod
 
 # Start from nginx
 FROM registry.access.redhat.com/ubi8/nginx-118
 
-# Set a build argument for the application name
+# Specify which application (subfolder of dist) to use
 ARG APPLICATION="main"
 
-# Copy the nginx configuration
-COPY ./nginx/nginx.conf /opt/app-root/etc/nginx.default.d/default.conf
-
-# Copy build from the 'build environment'
-COPY --from=build /opt/app-root/src/app/dist/${APPLICATION} /opt/app-root/src/
-
-CMD nginx -g "daemon off;"
+USER root
+# Copying in source code
+COPY --from=build /opt/app-root/src/app/dist/${APPLICATION} /tmp/src
+COPY ./nginx/nginx.conf /tmp/src/nginx-default-cfg/default.conf
+RUN ls /tmp/src
+# Change file ownership to the assemble user. Builder image must support chown command.
+RUN chown -R 1001:0 /tmp/src
+USER 1001
+# Assemble script sourced from builder image based on user input or image metadata.
+# If this file does not exist in the image, the build will fail.
+RUN /usr/libexec/s2i/assemble
+# Run script sourced from builder image based on user input or image metadata.
+# If this file does not exist in the image, the build will fail.
+CMD /usr/libexec/s2i/run
